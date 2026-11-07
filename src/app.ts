@@ -5,8 +5,8 @@ import { requestContext } from "./request-context.middleware";
 import { AppError, type Company, type CompanyRepository } from "./repository";
 import { parseCompanyInput, parseRecruiterInput } from "./validation";
 
-/** Path prefix of the resource routes. Change here if the gateway forwards a different prefix. */
-export const ROUTE_PREFIX = "";
+/** Path prefix of the resource routes. The gateway forwards /api/companies/* and /api/recruiters/* unchanged; probes stay unprefixed. */
+export const ROUTE_PREFIX = "/api";
 
 function emptyCompany(id: string, name: string): Company {
   return { id, name, description: "", website: "", industry: "", size: "", location: "", logoUrl: "", updatedAt: null };

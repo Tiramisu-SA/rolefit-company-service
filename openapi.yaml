@@ -1,0 +1,174 @@
+openapi: 3.0.3
+info:
+  title: RoleFit Company Service
+  version: 0.1.0
+  description: >
+    Company and recruiter profiles (FR-03). Reached through the API Gateway, which verifies the
+    Supabase token and forwards X-User-Id, X-User-Role, X-Company-Id and X-Company-Name
+    (URI-encoded). The gateway exposes the same paths on its own port.
+servers:
+  - url: http://localhost:3008
+    description: Service directly
+  - url: http://localhost:8080
+    description: API Gateway
+tags:
+  - name: Companies
+  - name: Recruiters
+  - name: Probes
+paths:
+  /api/companies/me:
+    get:
+      tags: [Companies]
+      summary: Own company profile (default if never saved)
+      operationId: getMyCompany
+      parameters: [{ $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/UserRole' }, { $ref: '#/components/parameters/CompanyId' }, { $ref: '#/components/parameters/CompanyName' }]
+      responses:
+        '200': { description: The company, content: { application/json: { schema: { $ref: '#/components/schemas/Company' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    put:
+      tags: [Companies]
+      summary: Create or replace own company profile
+      operationId: putMyCompany
+      parameters: [{ $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/UserRole' }, { $ref: '#/components/parameters/CompanyId' }, { $ref: '#/components/parameters/CompanyName' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyInput' }
+      responses:
+        '200': { description: The saved company, content: { application/json: { schema: { $ref: '#/components/schemas/Company' } } } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/companies/{id}:
+    get:
+      tags: [Companies]
+      summary: Read one company (any signed-in user)
+      operationId: getCompany
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+        - { $ref: '#/components/parameters/UserRole' }
+        - { name: id, in: path, required: true, schema: { type: string, example: co-acme-1a2b3c } }
+      responses:
+        '200': { description: The company, content: { application/json: { schema: { $ref: '#/components/schemas/Company' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/recruiters/me:
+    get:
+      tags: [Recruiters]
+      summary: Own recruiter profile (empty defaults if never saved)
+      operationId: getMyRecruiter
+      parameters: [{ $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/UserRole' }, { $ref: '#/components/parameters/CompanyId' }]
+      responses:
+        '200': { description: The profile, content: { application/json: { schema: { $ref: '#/components/schemas/RecruiterProfile' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    put:
+      tags: [Recruiters]
+      summary: Create or replace own recruiter profile
+      operationId: putMyRecruiter
+      parameters: [{ $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/UserRole' }, { $ref: '#/components/parameters/CompanyId' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecruiterInput' }
+      responses:
+        '200': { description: The saved profile, content: { application/json: { schema: { $ref: '#/components/schemas/RecruiterProfile' } } } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /health:
+    get:
+      tags: [Probes]
+      summary: Liveness
+      operationId: health
+      responses:
+        '200': { description: Alive, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [ok] } } } } } }
+  /ready:
+    get:
+      tags: [Probes]
+      summary: Readiness (checks the database)
+      operationId: ready
+      responses:
+        '200': { description: Ready, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [ready] } } } } } }
+        '503': { description: Database unreachable, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [unavailable] } } } } } }
+components:
+  parameters:
+    UserId: { name: X-User-Id, in: header, required: true, description: Verified Supabase user id set by the gateway, schema: { type: string } }
+    UserRole: { name: X-User-Role, in: header, required: true, description: Role set by the gateway, schema: { type: string, enum: [recruiter, seeker] } }
+    CompanyId: { name: X-Company-Id, in: header, required: false, description: Recruiter's company id (required on recruiter routes), schema: { type: string, example: co-acme-1a2b3c } }
+    CompanyName: { name: X-Company-Name, in: header, required: false, description: Company name from signup, URI-encoded, schema: { type: string, example: Acme%20Corp } }
+  schemas:
+    CompanySize:
+      type: string
+      enum: ['', 1-10, 11-50, 51-200, 201-1000, 1000+]
+    Company:
+      type: object
+      required: [id, name, description, website, industry, size, location, logoUrl, updatedAt]
+      properties:
+        id: { type: string, example: co-acme-1a2b3c }
+        name: { type: string, example: Acme Corp }
+        description: { type: string, maxLength: 2000 }
+        website: { type: string, maxLength: 200, description: Empty or an https URL }
+        industry: { type: string, maxLength: 200 }
+        size: { $ref: '#/components/schemas/CompanySize' }
+        location: { type: string, maxLength: 200 }
+        logoUrl: { type: string, maxLength: 200, description: Empty or an https URL }
+        updatedAt: { type: string, format: date-time, nullable: true, description: Null for a company never saved }
+    CompanyInput:
+      type: object
+      description: Missing fields become empty. id and name cannot be set.
+      properties:
+        description: { type: string, maxLength: 2000 }
+        website: { type: string, maxLength: 200, description: Empty or an https URL }
+        industry: { type: string, maxLength: 200 }
+        size: { $ref: '#/components/schemas/CompanySize' }
+        location: { type: string, maxLength: 200 }
+        logoUrl: { type: string, maxLength: 200, description: Empty or an https URL }
+    RecruiterProfile:
+      type: object
+      required: [userId, companyId, displayName, jobTitle, updatedAt]
+      properties:
+        userId: { type: string }
+        companyId: { type: string }
+        displayName: { type: string, maxLength: 200 }
+        jobTitle: { type: string, maxLength: 200 }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    RecruiterInput:
+      type: object
+      properties:
+        displayName: { type: string, maxLength: 200 }
+        jobTitle: { type: string, maxLength: 200 }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION_ERROR, UNAUTHENTICATED, FORBIDDEN, NO_COMPANY, COMPANY_NOT_FOUND, ROUTE_NOT_FOUND, SERVICE_UNAVAILABLE]
+            message: { type: string }
+            details:
+              type: array
+              description: Only on VALIDATION_ERROR
+              items:
+                type: object
+                required: [field, message]
+                properties: { field: { type: string }, message: { type: string } }
+  responses:
+    Validation: { description: Invalid body (VALIDATION_ERROR), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthenticated: { description: No X-User-Id (UNAUTHENTICATED), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Wrong role (FORBIDDEN) or recruiter without a company (NO_COMPANY), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Unknown company (COMPANY_NOT_FOUND), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unavailable: { description: Database error (SERVICE_UNAVAILABLE), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
